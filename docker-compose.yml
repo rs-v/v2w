@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  v2w:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    volumes:
+      # Optional: mount a local model cache so weights are not re-downloaded
+      - model_cache:/root/.cache
+
+volumes:
+  model_cache:
