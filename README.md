@@ -26,8 +26,9 @@
 docker compose up --build
 ```
 
-The service will be available at <http://localhost:8000>.  
-Interactive API docs: <http://localhost:8000/docs>
+The service will be available at:
+- **Web Interface**: <http://localhost:8000>
+- **Interactive API docs**: <http://localhost:8000/docs>
 
 ### Run locally
 
@@ -35,6 +36,22 @@ Interactive API docs: <http://localhost:8000/docs>
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
+
+---
+
+## Usage
+
+### Web Interface
+
+Open your browser and navigate to <http://localhost:8000> to access the web interface.
+
+The web interface provides:
+- **Drag-and-drop** file upload
+- **Image preview** before conversion
+- **Progress tracking** during conversion
+- **Automatic download** of the generated Word document
+
+Simply upload a screenshot containing text and/or mathematical formulas, and the system will automatically convert it to an editable Word document.
 
 ---
 
