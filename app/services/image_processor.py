@@ -16,8 +16,33 @@ logger = logging.getLogger(__name__)
 
 # Heuristic: if more than this fraction of detected characters look like math
 # symbols we treat the whole block as a formula region.
-_MATH_CHARS = set("∑∏∫∂∇αβγδεζηθικλμνξοπρσςτυφχψωΩ±×÷√∞∈∉⊂⊃∪∩≤≥≠≈→←↑↓")
-_MATH_THRESHOLD = 0.08
+_MATH_CHARS = set(
+    # Greek letters and special math symbols
+    "∑∏∫∂∇αβγδεζηθικλμνξοπρσςτυφχψωΩ±×÷√∞∈∉⊂⊃∪∩≤≥≠≈→←↑↓"
+    # Common ASCII math operators and punctuation that rarely appear in plain text
+    "^_{}\\|"
+)
+_MATH_THRESHOLD = 0.05
+
+# Patterns that strongly indicate a mathematical expression even without
+# special Unicode math characters.  We check these as secondary signals.
+import re as _re
+
+_MATH_PATTERN = _re.compile(
+    r"""
+    # Fraction-like: digit/digit or variable/variable
+    [A-Za-z0-9]\s*/\s*[A-Za-z0-9]
+    # Exponent notation: x^2, e^{...}
+    |[A-Za-z0-9]\^
+    # Subscript notation: x_i, a_{ij}
+    |[A-Za-z0-9]_
+    # Common operators surrounded by operands
+    |[A-Za-z0-9]\s*[+\-=<>]\s*[A-Za-z0-9]
+    # Lone equals sign between math-ish tokens
+    |=\s*[A-Za-z0-9]
+    """,
+    _re.VERBOSE,
+)
 
 
 def _is_likely_formula(text: str) -> bool:
@@ -26,7 +51,12 @@ def _is_likely_formula(text: str) -> bool:
         return False
     math_count = sum(1 for ch in text if ch in _MATH_CHARS)
     ratio = math_count / len(text)
-    return ratio >= _MATH_THRESHOLD
+    if ratio >= _MATH_THRESHOLD:
+        return True
+    # Secondary check: look for ASCII math expression patterns
+    if _MATH_PATTERN.search(text):
+        return True
+    return False
 
 
 def _crop_to_bbox(image: Image.Image, bbox: BBox) -> Image.Image:

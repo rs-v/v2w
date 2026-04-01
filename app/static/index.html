@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>v2w - 截图转Word</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <!-- MathJax for rendering LaTeX formulas in the preview -->
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+            options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'] }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
 </head>
 <body>
     <div class="container">
@@ -30,8 +38,8 @@
                     <button class="btn btn-secondary" id="clearBtn">清除</button>
                 </div>
 
-                <button class="btn btn-primary" id="convertBtn" disabled>
-                    <span id="btnText">开始转换</span>
+                <button class="btn btn-primary" id="recognizeBtn" disabled>
+                    <span id="btnText">开始识别</span>
                 </button>
 
                 <div class="progress-bar" id="progressBar" style="display: none;">
@@ -39,6 +47,18 @@
                 </div>
 
                 <div class="status-message" id="statusMessage"></div>
+            </div>
+
+            <!-- Recognition results panel (hidden until recognition succeeds) -->
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <h2>识别结果</h2>
+                <p class="results-hint">以下是从图片中识别到的内容，公式以 LaTeX 形式渲染展示。确认后可下载 Word 文档。</p>
+                <div class="results-blocks" id="resultsBlocks"></div>
+                <div class="results-actions">
+                    <button class="btn btn-primary" id="downloadBtn">
+                        <span id="downloadBtnText">⬇️ 下载 Word 文档</span>
+                    </button>
+                </div>
             </div>
 
             <div class="features">
