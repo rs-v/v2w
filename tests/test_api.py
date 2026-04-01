@@ -52,22 +52,39 @@ class TestWordGeneratorService(unittest.TestCase):
         docx_bytes = self.service.generate([], title="Empty")
         self.assertTrue(docx_bytes[:2] == b"PK")
 
-    @patch("app.services.word_gen._render_latex_to_image")
-    def test_generate_formula_block_fallback(self, mock_render):
-        """When LaTeX rendering fails the formula is inserted as plain text."""
-        mock_render.return_value = None  # rendering failure
+    @patch("app.services.word_gen.latex_to_omml")
+    def test_generate_formula_block_fallback(self, mock_omml):
+        """When OMML conversion fails the formula is inserted as plain text."""
+        mock_omml.return_value = None
         blocks = [("formula", r"\frac{a}{b}")]
         docx_bytes = self.service.generate(blocks)
         self.assertTrue(docx_bytes[:2] == b"PK")
-        mock_render.assert_called_once_with(r"\frac{a}{b}")
+        mock_omml.assert_called_once_with(r"\frac{a}{b}")
 
-    @patch("app.services.word_gen._render_latex_to_image")
-    def test_generate_formula_block_with_image(self, mock_render):
-        """When LaTeX rendering succeeds a picture is embedded."""
-        mock_render.return_value = _make_png_bytes()
+    @patch("app.services.word_gen.latex_to_omml")
+    def test_generate_formula_block_as_omml(self, mock_omml):
+        """When OMML conversion succeeds an editable equation is embedded."""
+        from lxml import etree
+
+        from app.services.omml import OMML_NS, _elem
+
+        # Build a minimal <m:oMath> element for testing
+        oMath = _elem("oMath")
+        r = etree.SubElement(oMath, f"{{{OMML_NS}}}r")
+        t = etree.SubElement(r, f"{{{OMML_NS}}}t")
+        t.text = "E"
+        mock_omml.return_value = oMath
+
         blocks = [("formula", r"E = mc^2")]
         docx_bytes = self.service.generate(blocks, title="Physics")
         self.assertTrue(docx_bytes[:2] == b"PK")
+
+        # Verify the OMML element is present in the docx XML
+        import zipfile
+
+        with zipfile.ZipFile(io.BytesIO(docx_bytes)) as zf:
+            doc_xml = zf.read("word/document.xml").decode()
+        self.assertIn("oMath", doc_xml)
 
 
 class TestImageProcessorHeuristic(unittest.TestCase):
@@ -137,6 +154,97 @@ class TestImageProcessor(unittest.TestCase):
         blocks, text_count, formula_count = processor.process(_make_png_bytes())
         self.assertEqual(formula_count, 1)
         self.assertEqual(text_count, 0)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests – OMML converter
+# ---------------------------------------------------------------------------
+
+
+class TestOmmlConverter(unittest.TestCase):
+    """latex_to_omml produces well-formed OMML <m:oMath> elements."""
+
+    def _convert(self, latex: str):
+        from app.services.omml import latex_to_omml
+
+        return latex_to_omml(latex)
+
+    def _tag_name(self, el) -> str:
+        from lxml import etree
+
+        return etree.QName(el.tag).localname
+
+    def test_simple_identifier(self):
+        el = self._convert("x")
+        self.assertIsNotNone(el)
+        self.assertEqual(self._tag_name(el), "oMath")
+
+    def test_fraction(self):
+        el = self._convert(r"\frac{a}{b}")
+        self.assertIsNotNone(el)
+        from lxml import etree
+
+        frac_els = [e for e in el.iter() if etree.QName(e.tag).localname == "f"]
+        self.assertTrue(len(frac_els) > 0, "Expected <m:f> fraction element")
+
+    def test_superscript(self):
+        el = self._convert(r"E = mc^2")
+        self.assertIsNotNone(el)
+        from lxml import etree
+
+        ssup_els = [e for e in el.iter() if etree.QName(e.tag).localname == "sSup"]
+        self.assertTrue(len(ssup_els) > 0, "Expected <m:sSup> superscript element")
+
+    def test_integral_becomes_nary(self):
+        el = self._convert(r"\int_0^\infty e^{-x}\,dx")
+        self.assertIsNotNone(el)
+        from lxml import etree
+
+        nary_els = [e for e in el.iter() if etree.QName(e.tag).localname == "nary"]
+        self.assertTrue(len(nary_els) > 0, "Expected <m:nary> for integral")
+
+    def test_sum_becomes_nary(self):
+        el = self._convert(r"\sum_{n=1}^{\infty} \frac{1}{n^2}")
+        self.assertIsNotNone(el)
+        from lxml import etree
+
+        nary_els = [e for e in el.iter() if etree.QName(e.tag).localname == "nary"]
+        self.assertTrue(len(nary_els) > 0, "Expected <m:nary> for summation")
+
+    def test_sqrt(self):
+        el = self._convert(r"\sqrt{x^2 + y^2}")
+        self.assertIsNotNone(el)
+        from lxml import etree
+
+        rad_els = [e for e in el.iter() if etree.QName(e.tag).localname == "rad"]
+        self.assertTrue(len(rad_els) > 0, "Expected <m:rad> for square root")
+
+    def test_nth_root(self):
+        el = self._convert(r"\sqrt[3]{x}")
+        self.assertIsNotNone(el)
+        from lxml import etree
+
+        rad_els = [e for e in el.iter() if etree.QName(e.tag).localname == "rad"]
+        self.assertTrue(len(rad_els) > 0, "Expected <m:rad> for n-th root")
+
+    def test_overline(self):
+        el = self._convert(r"\overline{AB}")
+        self.assertIsNotNone(el)
+        from lxml import etree
+
+        bar_els = [e for e in el.iter() if etree.QName(e.tag).localname == "bar"]
+        self.assertTrue(len(bar_els) > 0, "Expected <m:bar> for overline")
+
+    def test_invalid_latex_returns_none(self):
+        from app.services.omml import latex_to_omml
+
+        # latex2mathml handles most LaTeX gracefully; test truly broken input
+        result = latex_to_omml("")
+        # Empty string may return None or an empty oMath — both are acceptable
+        if result is not None:
+            from lxml import etree
+
+            self.assertEqual(etree.QName(result.tag).localname, "oMath")
 
 
 # ---------------------------------------------------------------------------

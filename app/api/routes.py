@@ -66,8 +66,9 @@ async def convert_image_to_word(
 ) -> Response:
     """Upload a screenshot and receive a Word document with recognised text and formulas.
 
-    - **Text** regions are inserted as paragraphs.
-    - **Formula** regions are rendered as images (with their LaTeX source).
+    - **Text** regions are inserted as editable paragraphs.
+    - **Formula** regions are converted to editable OMML equations (Word native
+      math format, fully compatible with Word's equation editor and MathType).
 
     The endpoint returns the `.docx` file as a binary download.
     """

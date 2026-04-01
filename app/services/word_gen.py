@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import io
 import logging
-import tempfile
 from typing import List, Optional, Tuple
 
-from PIL import Image
+from lxml import etree
+
+from app.services.omml import OMML_NS, latex_to_omml
 
 logger = logging.getLogger(__name__)
 
@@ -16,27 +17,44 @@ TEXT_BLOCK = "text"
 FORMULA_BLOCK = "formula"
 
 
-def _render_latex_to_image(latex: str, dpi: int = 150) -> Optional[bytes]:
-    """Render a LaTeX formula string to a PNG image using Matplotlib.
+def _add_equation_paragraph(doc, latex: str) -> bool:
+    """Insert an editable OMML equation as a new paragraph in *doc*.
 
-    Returns PNG bytes, or ``None`` if rendering fails.
+    The equation is embedded as ``<m:oMathPara><m:oMath>…</m:oMath></m:oMathPara>``
+    inside a Word paragraph, making it fully editable in Word's equation
+    editor and in MathType.
+
+    Parameters
+    ----------
+    doc:
+        A ``python-docx`` ``Document`` instance.
+    latex:
+        LaTeX math string (without surrounding ``$`` signs).
+
+    Returns
+    -------
+    ``True`` if the equation was inserted successfully, ``False`` otherwise.
     """
-    try:
-        import matplotlib  # noqa: PLC0415
+    oMath = latex_to_omml(latex)
+    if oMath is None:
+        logger.warning("Could not convert LaTeX to OMML: %s", latex)
+        return False
 
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt  # noqa: PLC0415
+    para = doc.add_paragraph()
+    p = para._p
 
-        fig = plt.figure(figsize=(0.01, 0.01))
-        fig.text(0, 0, f"${latex}$", fontsize=14)
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.1)
-        plt.close(fig)
-        buf.seek(0)
-        return buf.read()
-    except Exception:
-        logger.exception("Failed to render LaTeX '%s' to image.", latex)
-        return None
+    # Remove any empty <w:r> run that python-docx adds automatically
+    W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    for run in p.findall(f"{{{W_NS}}}r"):
+        p.remove(run)
+
+    # Wrap the <m:oMath> element in <m:oMathPara>
+    oMathPara = etree.SubElement(p, f"{{{OMML_NS}}}oMathPara")
+    oMath_dest = etree.SubElement(oMathPara, f"{{{OMML_NS}}}oMath")
+    for child in list(oMath):
+        oMath_dest.append(child)
+
+    return True
 
 
 class WordGeneratorService:
@@ -63,7 +81,7 @@ class WordGeneratorService:
         Raw ``.docx`` bytes.
         """
         from docx import Document  # noqa: PLC0415
-        from docx.shared import Inches, Pt  # noqa: PLC0415
+        from docx.shared import Pt  # noqa: PLC0415
 
         doc = Document()
 
@@ -75,12 +93,9 @@ class WordGeneratorService:
             if block_type == TEXT_BLOCK:
                 doc.add_paragraph(content)
             elif block_type == FORMULA_BLOCK:
-                png_bytes = _render_latex_to_image(content)
-                if png_bytes:
-                    img_stream = io.BytesIO(png_bytes)
-                    doc.add_picture(img_stream, width=Inches(4))
-                    doc.add_paragraph(f"[LaTeX: {content}]").italic = True
-                else:
+                inserted = _add_equation_paragraph(doc, content)
+                if not inserted:
+                    # Fallback: insert the raw LaTeX as plain text
                     doc.add_paragraph(f"[Formula: {content}]")
 
         buf = io.BytesIO()
