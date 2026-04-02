@@ -61,15 +61,19 @@ function handleFile(file) {
 
     selectedFile = file;
     recognisedBlocks = [];
+    btnText.textContent = '开始识别';
     recognizeBtn.disabled = false;
+    uploadArea.style.display = 'none';
+    previewSection.style.display = 'block';
+    resultsSection.style.display = 'none';
+    showStatus('', '');
 
     const reader = new FileReader();
     reader.onload = (e) => {
         preview.src = e.target.result;
-        uploadArea.style.display = 'none';
-        previewSection.style.display = 'block';
-        resultsSection.style.display = 'none';
-        showStatus('', '');
+    };
+    reader.onerror = () => {
+        showStatus('图片加载失败，请重试。', 'error');
     };
     reader.readAsDataURL(file);
 }
