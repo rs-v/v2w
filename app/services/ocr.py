@@ -24,7 +24,14 @@ class TextOCRService:
     def _get_reader(self):
         """Lazily initialise the EasyOCR reader to speed up import time."""
         if self._reader is None:
-            import easyocr  # noqa: PLC0415
+            try:
+                import easyocr  # noqa: PLC0415
+            except ModuleNotFoundError as exc:
+                raise RuntimeError(
+                    "EasyOCR is not installed. "
+                    "Run `pip install easyocr>=1.7.1` (or `pip install -r requirements.txt`) "
+                    "and restart the server."
+                ) from exc
 
             self._reader = easyocr.Reader(self._languages, gpu=False, verbose=False)
         return self._reader
