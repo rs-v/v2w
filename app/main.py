@@ -1,9 +1,11 @@
-"""FastAPI application entry point for the v2w cloud service."""
+"""FastAPI application entry point for the v2w formula recognition service."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,26 +13,51 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.api.routes import router
+from app.services.formula import FormulaRecognitionService
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
 )
 
-# Allow callers to restrict CORS origins via an environment variable.
-# In development the default is "*"; in production set CORS_ORIGINS to a
-# comma-separated list of trusted origins, e.g.
-#   CORS_ORIGINS=https://app.example.com,https://admin.example.com
+logger = logging.getLogger(__name__)
+
 _cors_origins_env = os.getenv("CORS_ORIGINS", "*")
 _cors_origins = (
     ["*"] if _cors_origins_env == "*" else [o.strip() for o in _cors_origins_env.split(",")]
 )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: eagerly load the formula model at startup.
+
+    This mirrors the pattern used by the pix2tex reference API, which calls
+    ``LatexOCR()`` inside ``@app.on_event('startup')`` so the model is warm
+    and ready before the first prediction request arrives.
+    """
+    formula_service = FormulaRecognitionService()
+    try:
+        await asyncio.to_thread(formula_service.initialize)
+    except Exception:
+        logger.warning(
+            "Formula model pre-loading failed; the model will be retried on each request.",
+            exc_info=True,
+        )
+
+    app.state.formula_service = formula_service
+    logger.info("Application startup complete.")
+
+    yield
+
+    logger.info("Application shutting down.")
+
+
 app = FastAPI(
-    title="v2w – Screenshot to Word",
+    title="v2w – Formula Recognition",
     description=(
-        "A cloud service that recognises text and mathematical formulas from "
-        "screenshots and converts them to Microsoft Word (.docx) documents."
+        "A service that recognises mathematical formulas from images and returns "
+        "the corresponding LaTeX code, powered by pix2tex (LaTeX-OCR)."
     ),
     version="1.0.0",
     contact={
@@ -40,6 +67,7 @@ app = FastAPI(
     license_info={
         "name": "MIT",
     },
+    lifespan=lifespan,
 )
 
 app.add_middleware(

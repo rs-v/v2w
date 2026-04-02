@@ -1,15 +1,6 @@
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel
-
-
-class ConvertResponse(BaseModel):
-    """Response model for image-to-Word conversion."""
-
-    filename: str
-    text_blocks: int
-    formula_blocks: int
-    message: str
 
 
 class HealthResponse(BaseModel):
@@ -27,24 +18,8 @@ class ErrorResponse(BaseModel):
     error_type: Optional[str] = None
 
 
-class ContentBlock(BaseModel):
-    """A single recognised content block (text or LaTeX formula)."""
+class PredictResponse(BaseModel):
+    """Response model for the /predict endpoint."""
 
-    block_type: str  # "text" or "formula"
-    content: str
-
-
-class RecognizeResponse(BaseModel):
-    """Response model for the /recognize endpoint."""
-
-    blocks: List[ContentBlock]
-    text_count: int
-    formula_count: int
+    latex: Optional[str]
     message: str
-
-
-class GenerateWordRequest(BaseModel):
-    """Request body for the /generate-word endpoint."""
-
-    blocks: List[ContentBlock]
-    title: Optional[str] = None
