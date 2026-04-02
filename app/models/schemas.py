@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -22,4 +22,18 @@ class PredictResponse(BaseModel):
     """Response model for the /predict endpoint."""
 
     latex: Optional[str]
+    message: str
+
+
+class Block(BaseModel):
+    """A single recognised content block."""
+
+    block_type: Literal["formula", "text"]
+    content: str
+
+
+class RecognizeResponse(BaseModel):
+    """Response model for the /recognize endpoint."""
+
+    blocks: List[Block]
     message: str

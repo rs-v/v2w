@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
-from app.models.schemas import HealthResponse, PredictResponse
+from app.models.schemas import Block, HealthResponse, PredictResponse, RecognizeResponse
 from app.services.formula import FormulaRecognitionService
 
 logger = logging.getLogger(__name__)
@@ -95,3 +95,44 @@ async def predict(
     if latex:
         return PredictResponse(latex=latex, message="公式识别成功。")
     return PredictResponse(latex=None, message="未能从图片中识别出公式。")
+
+
+@router.post(
+    "/recognize",
+    response_model=RecognizeResponse,
+    tags=["formula"],
+    summary="Recognize content blocks from an image",
+    responses={
+        400: {"description": "Invalid or unsupported image format."},
+        422: {"description": "Validation error."},
+        500: {"description": "Internal processing error."},
+    },
+)
+async def recognize(
+    file: Annotated[UploadFile, File(description="Image containing formulas (PNG / JPEG / WebP / BMP / TIFF)")],
+    formula_service: FormulaRecognitionService = Depends(get_formula_service),
+) -> RecognizeResponse:
+    """Upload an image and receive a list of recognized content blocks.
+
+    Currently recognizes mathematical formulas and returns each result as a
+    ``formula`` block.  The response shape is consumed by the web frontend to
+    render previews and generate Word documents.
+    """
+    _validate_image_upload(file)
+
+    image_bytes = await file.read()
+    if len(image_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    try:
+        latex = formula_service.recognise_from_bytes(image_bytes)
+    except Exception as exc:
+        logger.exception("Error processing image '%s'.", file.filename)
+        raise HTTPException(status_code=500, detail=f"Recognition failed: {exc}") from exc
+
+    if latex:
+        return RecognizeResponse(
+            blocks=[Block(block_type="formula", content=latex)],
+            message="公式识别成功。",
+        )
+    return RecognizeResponse(blocks=[], message="未能从图片中识别出公式。")

@@ -197,13 +197,61 @@ class TestAPIRoutes(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 404)
 
-    def test_recognize_endpoint_gone(self):
+    def test_recognize_returns_formula_block(self):
+        self._override_formula_service(latex_result=r"\frac{a}{b}")
         client = self._make_client()
         resp = client.post(
             "/api/v1/recognize",
-            files={"file": ("test.png", _make_png_bytes(), "image/png")},
+            files={"file": ("formula.png", _make_png_bytes(), "image/png")},
         )
-        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("blocks", data)
+        self.assertEqual(len(data["blocks"]), 1)
+        self.assertEqual(data["blocks"][0]["block_type"], "formula")
+        self.assertEqual(data["blocks"][0]["content"], r"\frac{a}{b}")
+        self.assertIn("message", data)
+
+    def test_recognize_no_result_returns_empty_blocks(self):
+        self._override_formula_service(latex_result=None)
+        client = self._make_client()
+        resp = client.post(
+            "/api/v1/recognize",
+            files={"file": ("formula.png", _make_png_bytes(), "image/png")},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["blocks"], [])
+
+    def test_recognize_unsupported_type(self):
+        client = self._make_client()
+        resp = client.post(
+            "/api/v1/recognize",
+            files={"file": ("test.txt", b"hello", "text/plain")},
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_recognize_empty_file(self):
+        client = self._make_client()
+        resp = client.post(
+            "/api/v1/recognize",
+            files={"file": ("empty.png", b"", "image/png")},
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_recognize_service_error_returns_500(self):
+        from app.api.routes import get_formula_service
+
+        mock_service = MagicMock()
+        mock_service.recognise_from_bytes.side_effect = RuntimeError("model exploded")
+        self.app.dependency_overrides[get_formula_service] = lambda: mock_service
+
+        client = self._make_client()
+        resp = client.post(
+            "/api/v1/recognize",
+            files={"file": ("formula.png", _make_png_bytes(), "image/png")},
+        )
+        self.assertEqual(resp.status_code, 500)
 
     def test_generate_word_endpoint_gone(self):
         client = self._make_client()
