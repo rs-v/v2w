@@ -1,7 +1,7 @@
-# v2w – Screenshot to Word
+# v2w – Formula Recognition
 
-> 截图识别公式等转 Word  
-> A cloud service that converts screenshots (containing text and mathematical formulas) into Microsoft Word (`.docx`) documents.
+> 公式图片识别 → LaTeX  
+> A service that takes an image of a mathematical formula and returns the corresponding LaTeX code, powered by [pix2tex (LaTeX-OCR)](https://github.com/lukas-blecher/LaTeX-OCR).
 
 ---
 
@@ -9,10 +9,7 @@
 
 | Capability | Technology |
 |---|---|
-| Text recognition (OCR) | [EasyOCR](https://github.com/JaidedAI/EasyOCR) – supports Chinese & English out of the box |
 | Formula recognition | [pix2tex](https://github.com/lukas-blecher/LaTeX-OCR) – LaTeX OCR |
-| Formula embedding | [latex2mathml](https://github.com/roniemartinez/latex2mathml) + custom MathML→OMML converter – editable OMML equations (MathType-compatible) |
-| Word generation | [python-docx](https://python-docx.readthedocs.io/) |
 | REST API | [FastAPI](https://fastapi.tiangolo.com/) |
 | Containerisation | Docker / docker-compose |
 
@@ -56,38 +53,32 @@ uv run uvicorn app.main:app --reload
 
 Open your browser and navigate to <http://localhost:8000> to access the web interface.
 
-The web interface provides:
-- **Drag-and-drop** file upload
-- **Image preview** before conversion
-- **Progress tracking** during conversion
-- **Automatic download** of the generated Word document
+### API
 
-Simply upload a screenshot containing text and/or mathematical formulas, and the system will automatically convert it to an editable Word document.
+#### `POST /api/v1/predict`
 
----
-
-## API
-
-### `POST /api/v1/convert`
-
-Upload a screenshot and receive a Word document.
+Upload an image of a mathematical formula and receive the corresponding LaTeX string.
 
 **Request** – `multipart/form-data`
 
 | Field | Type | Description |
 |---|---|---|
-| `file` | `UploadFile` | Image file (PNG / JPEG / WebP / BMP / TIFF) |
+| `file` | `UploadFile` | Formula image (PNG / JPEG / WebP / BMP / TIFF) |
 
-**Response** – `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+**Response** – `application/json`
 
-The response body is the `.docx` file ready for download.
+```json
+{
+  "latex": "\\frac{a}{b}",
+  "message": "公式识别成功。"
+}
+```
 
 **Example (cURL)**
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/convert \
-     -F "file=@screenshot.png;type=image/png" \
-     --output result.docx
+curl -X POST http://localhost:8000/api/v1/predict \
+     -F "file=@formula.png;type=image/png"
 ```
 
 **Example (Python `requests`)**
@@ -95,28 +86,25 @@ curl -X POST http://localhost:8000/api/v1/convert \
 ```python
 import requests
 
-with open("screenshot.png", "rb") as f:
+with open("formula.png", "rb") as f:
     resp = requests.post(
-        "http://localhost:8000/api/v1/convert",
-        files={"file": ("screenshot.png", f, "image/png")},
+        "http://localhost:8000/api/v1/predict",
+        files={"file": ("formula.png", f, "image/png")},
     )
 
-with open("result.docx", "wb") as out:
-    out.write(resp.content)
+print(resp.json()["latex"])
 ```
 
-### `GET /api/v1/health`
+#### `GET /api/v1/health`
 
-Returns service health and component information.
+Returns service health information.
 
 ```json
 {
   "status": "ok",
   "version": "1.0.0",
   "services": {
-    "ocr": "easyocr",
-    "formula": "pix2tex",
-    "word": "python-docx"
+    "formula": "pix2tex"
   }
 }
 ```
@@ -126,29 +114,15 @@ Returns service health and component information.
 ## How it Works
 
 ```
-Screenshot image
+Formula image
       │
       ▼
  ┌────────────┐
- │  EasyOCR   │  ──►  Text blocks (paragraphs)
- └────────────┘
-      │
-      ▼  (math-symbol heuristic)
- ┌────────────┐
  │  pix2tex   │  ──►  LaTeX string
- └────────────┘
-      │
-      ▼  (LaTeX → MathML → OMML)
- ┌────────────┐
- │ python-docx│  ──►  .docx with editable equations
  └────────────┘
 ```
 
-1. The uploaded image is passed through **EasyOCR** to detect all text blocks (bounding boxes included).
-2. Each block is checked with a heuristic (ratio of Greek / mathematical Unicode characters).
-3. Blocks that look like formulas are cropped to their bounding box and re-processed with **pix2tex** to obtain a LaTeX string.
-4. LaTeX strings are converted to **OMML** (Office Math Markup Language) via `latex2mathml` (LaTeX→MathML) and a custom lxml-based MathML→OMML converter, then embedded as **native editable equations** in the Word document — fully compatible with Word's built-in equation editor and **MathType**.
-5. The final `.docx` is streamed back to the client.
+The pix2tex model is loaded once at application **startup** (following the same pattern as the pix2tex reference API), so no cold-start latency is incurred on the first request.
 
 ---
 
@@ -175,14 +149,11 @@ uv run pytest
 ```
 v2w/
 ├── app/
-│   ├── main.py                  # FastAPI app & CORS setup
+│   ├── main.py                  # FastAPI app, lifespan startup, CORS
 │   ├── api/
-│   │   └── routes.py            # API endpoints
+│   │   └── routes.py            # API endpoints (/predict, /health)
 │   ├── services/
-│   │   ├── ocr.py               # EasyOCR text recognition
-│   │   ├── formula.py           # pix2tex formula recognition
-│   │   ├── image_processor.py   # Orchestration pipeline
-│   │   └── word_gen.py          # python-docx Word generation
+│   │   └── formula.py           # pix2tex formula recognition
 │   └── models/
 │       └── schemas.py           # Pydantic response models
 ├── tests/
