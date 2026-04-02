@@ -101,7 +101,7 @@ async def predict(
     "/recognize",
     response_model=RecognizeResponse,
     tags=["formula"],
-    summary="Recognise content blocks from an image",
+    summary="Recognize content blocks from an image",
     responses={
         400: {"description": "Invalid or unsupported image format."},
         422: {"description": "Validation error."},
@@ -112,9 +112,9 @@ async def recognize(
     file: Annotated[UploadFile, File(description="Image containing formulas (PNG / JPEG / WebP / BMP / TIFF)")],
     formula_service: FormulaRecognitionService = Depends(get_formula_service),
 ) -> RecognizeResponse:
-    """Upload an image and receive a list of recognised content blocks.
+    """Upload an image and receive a list of recognized content blocks.
 
-    Currently recognises mathematical formulas and returns each result as a
+    Currently recognizes mathematical formulas and returns each result as a
     ``formula`` block.  The response shape is consumed by the web frontend to
     render previews and generate Word documents.
     """
