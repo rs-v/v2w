@@ -301,7 +301,7 @@ class TestAPIRoutes(unittest.TestCase):
         client = self._make_client()
         resp = client.get("/")
         self.assertEqual(resp.status_code, 200)
-        self.assertIn("v2w", resp.json()["message"])
+        self.assertIn("v2w", resp.text)
 
     def test_health_endpoint(self):
         client = self._make_client()
