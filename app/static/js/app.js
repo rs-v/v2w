@@ -61,13 +61,13 @@ function handleFile(file) {
 
     selectedFile = file;
     recognisedBlocks = [];
+    recognizeBtn.disabled = false;
 
     const reader = new FileReader();
     reader.onload = (e) => {
         preview.src = e.target.result;
         uploadArea.style.display = 'none';
         previewSection.style.display = 'block';
-        recognizeBtn.disabled = false;
         resultsSection.style.display = 'none';
         showStatus('', '');
     };
