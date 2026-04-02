@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -25,3 +25,26 @@ class ErrorResponse(BaseModel):
 
     detail: str
     error_type: Optional[str] = None
+
+
+class ContentBlock(BaseModel):
+    """A single recognised content block (text or LaTeX formula)."""
+
+    block_type: str  # "text" or "formula"
+    content: str
+
+
+class RecognizeResponse(BaseModel):
+    """Response model for the /recognize endpoint."""
+
+    blocks: List[ContentBlock]
+    text_count: int
+    formula_count: int
+    message: str
+
+
+class GenerateWordRequest(BaseModel):
+    """Request body for the /generate-word endpoint."""
+
+    blocks: List[ContentBlock]
+    title: Optional[str] = None

@@ -106,6 +106,17 @@ class TestImageProcessorHeuristic(unittest.TestCase):
 
         self.assertFalse(_is_likely_formula(""))
 
+    def test_ascii_math_pattern_detected(self):
+        from app.services.image_processor import _is_likely_formula
+
+        # ASCII expression with = and letter/digit operands
+        self.assertTrue(_is_likely_formula("E=mc^2"))
+
+    def test_fraction_pattern_detected(self):
+        from app.services.image_processor import _is_likely_formula
+
+        self.assertTrue(_is_likely_formula("a/b"))
+
 
 class TestImageProcessor(unittest.TestCase):
     """ImageProcessor correctly orchestrates OCR and formula services."""
@@ -334,6 +345,57 @@ class TestAPIRoutes(unittest.TestCase):
             files={"file": ("empty.png", b"", "image/png")},
         )
         self.assertEqual(resp.status_code, 400)
+
+    @patch("app.api.routes._image_processor")
+    def test_recognize_valid_png(self, mock_proc):
+        mock_proc.process.return_value = (
+            [("text", "Hello"), ("formula", r"\frac{a}{b}")],
+            1,
+            1,
+        )
+        client = self._make_client()
+        resp = client.post(
+            "/api/v1/recognize",
+            files={"file": ("test.png", _make_png_bytes(), "image/png")},
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["text_count"], 1)
+        self.assertEqual(data["formula_count"], 1)
+        self.assertEqual(len(data["blocks"]), 2)
+        self.assertEqual(data["blocks"][0]["block_type"], "text")
+        self.assertEqual(data["blocks"][1]["block_type"], "formula")
+
+    def test_recognize_unsupported_type(self):
+        client = self._make_client()
+        resp = client.post(
+            "/api/v1/recognize",
+            files={"file": ("test.txt", b"hello", "text/plain")},
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    @patch("app.api.routes._word_generator")
+    def test_generate_word_from_blocks(self, mock_gen):
+        mock_gen.generate.return_value = b"PK\x03\x04"
+
+        client = self._make_client()
+        payload = {
+            "blocks": [
+                {"block_type": "text", "content": "Hello world"},
+                {"block_type": "formula", "content": r"\frac{a}{b}"},
+            ],
+            "title": "Test",
+        }
+        resp = client.post("/api/v1/generate-word", json=payload)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            resp.headers["content-type"],
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        mock_gen.generate.assert_called_once_with(
+            [("text", "Hello world"), ("formula", r"\frac{a}{b}")],
+            title="Test",
+        )
 
 
 if __name__ == "__main__":

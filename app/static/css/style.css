@@ -282,3 +282,87 @@ footer a:hover {
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Results panel ──────────────────────────────────────────────────────────── */
+
+.results-section {
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.results-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.results-hint {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+.results-blocks {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.no-results {
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 1rem;
+}
+
+.result-block {
+    position: relative;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 1rem 1rem 1rem 1.25rem;
+    background: var(--bg-color);
+}
+
+.result-block--formula {
+    border-left: 4px solid var(--primary-color);
+    background: #f0f4ff;
+}
+
+.result-block--text {
+    border-left: 4px solid var(--success-color);
+}
+
+.result-block__label {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: white;
+    background: var(--text-secondary);
+    border-radius: 0.25rem;
+    padding: 0.1rem 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.result-block--formula .result-block__label {
+    background: var(--primary-color);
+}
+
+.result-block--text .result-block__label {
+    background: var(--success-color);
+}
+
+.result-block__content {
+    font-size: 1rem;
+    line-height: 1.7;
+    word-break: break-word;
+    overflow-x: auto;
+}
+
+.results-actions {
+    display: flex;
+    justify-content: center;
+}
+
