@@ -32,10 +32,21 @@ The service will be available at:
 
 ### Run locally
 
+**Using pip:**
+
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
+
+**Using uv:**
+
+```bash
+uv pip install -r requirements.txt
+uv run uvicorn app.main:app --reload
+```
+
+> **Note (uv users):** Always use `uv run uvicorn …` (not plain `uvicorn …`) so the server runs inside the uv-managed virtual environment where all dependencies are installed.
 
 ---
 
@@ -145,9 +156,18 @@ Screenshot image
 
 ### Run tests
 
+**Using pip:**
+
 ```bash
 pip install -r requirements.txt
 pytest
+```
+
+**Using uv:**
+
+```bash
+uv pip install -r requirements.txt
+uv run pytest
 ```
 
 ### Project layout
